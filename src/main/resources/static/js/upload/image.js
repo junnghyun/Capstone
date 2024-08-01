@@ -38,7 +38,7 @@ const createFileItemHTML = (file, uniqueIdentifier) => {
 const handleFileUploading = (file, uniqueIdentifier) => {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("image", file); // 'file'에서 'image'로 변경
 
     xhr.upload.addEventListener("progress", (e) => {
         const fileProgress = document.querySelector(`#file-item-${uniqueIdentifier} .file-progress`);
@@ -51,7 +51,7 @@ const handleFileUploading = (file, uniqueIdentifier) => {
         fileSize.innerText = formattedFileSize;
     });
 
-    xhr.open("POST", "/api/uploads", true);
+    xhr.open("POST", "/api/uploads/upload", true); // URL 수정
     xhr.send(formData);
 
     return xhr;

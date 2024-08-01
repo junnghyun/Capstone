@@ -3,6 +3,7 @@ package nsu.stone.domain;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.postgis.Point;
 
 @Entity
 @Getter @Setter
@@ -12,9 +13,22 @@ public class Upload {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Integer imageNumber;
-    private Double x1, y1, x2, y2, x3, y3, x4, y4;
+    @Column(name = "image_path", nullable = false)
+    private String imagePath;
 
-    @Lob
-    private byte[] image;
+    @Column(name = "top_left", columnDefinition = "geometry(Point, 4326)")
+    private Point topLeft;
+
+    @Column(name = "top_right", columnDefinition = "geometry(Point, 4326)")
+    private Point topRight;
+
+    @Column(name = "bottom_left", columnDefinition = "geometry(Point, 4326)")
+    private Point bottomLeft;
+
+    @Column(name = "bottom_right", columnDefinition = "geometry(Point, 4326)")
+    private Point bottomRight;
+
+    @Column(name = "status")
+    private String status;
+
 }
