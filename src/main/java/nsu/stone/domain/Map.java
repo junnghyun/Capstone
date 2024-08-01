@@ -9,7 +9,7 @@ import java.util.UUID;
 @Entity
 @Getter
 @Setter
-@Table(name = "load_db", schema = "public")
+@Table(name = "map", schema = "public")
 public class Map {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)

@@ -33,6 +33,11 @@ public class MapServiceImpl implements MapService {
         return convertToDto(map);
     }
 
+    @Override
+    public void deleteMap(UUID id) {
+        mapRepository.deleteById(id);
+    }
+
     private MapDto convertToDto(Map map) {
         MapDto mapDto = new MapDto();
         mapDto.setId(map.getId());
