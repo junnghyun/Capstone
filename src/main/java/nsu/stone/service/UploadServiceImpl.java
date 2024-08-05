@@ -18,7 +18,7 @@ public class UploadServiceImpl implements UploadService {
 
     private final UploadRepository uploadRepository;
     private final RestTemplate restTemplate;
-    private static final String GEOSERVER_WPS_URL = "http://localhost:8080/geoserver/ows?service=WPS&version=1.0.0&request=Execute";
+    private static final String GEOSERVER_WPS_URL = "https://localhost:8081/geoserver/ows?service=WPS&version=1.0.0&request=Execute";
 
     @Autowired
     public UploadServiceImpl(UploadRepository uploadRepository, RestTemplate restTemplate) {
@@ -57,34 +57,7 @@ public class UploadServiceImpl implements UploadService {
 
     private double[][] getCoordinatesFromGeoserver(String imagePath) {
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_XML);
-
-            String requestBody = String.format(
-                    "<wps:Execute version=\"1.0.0\" service=\"WPS\" " +
-                            "xmlns:wps=\"http://www.opengis.net/wps/1.0.0\" " +
-                            "xmlns:ows=\"http://www.opengis.net/ows/1.1\" " +
-                            "xmlns:xlink=\"http://www.w3.org/1999/xlink\" " +
-                            "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" " +
-                            "xsi:schemaLocation=\"http://www.opengis.net/wps/1.0.0 " +
-                            "http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd\">" +
-                            "<ows:Identifier>your-wps-process-id</ows:Identifier>" +
-                            "<wps:DataInputs>" +
-                            "<wps:Input>" +
-                            "<ows:Identifier>imagePath</ows:Identifier>" +
-                            "<wps:Data>" +
-                            "<wps:LiteralData>%s</wps:LiteralData>" +
-                            "</wps:Data>" +
-                            "</wps:Input>" +
-                            "</wps:DataInputs>" +
-                            "<wps:ResponseForm>" +
-                            "<wps:RawDataOutput>" +
-                            "<ows:Identifier>result</ows:Identifier>" +
-                            "</wps:RawDataOutput>" +
-                            "</wps:ResponseForm>" +
-                            "</wps:Execute>", imagePath);
-
-            HttpEntity<String> entity = new HttpEntity<>(requestBody, headers);
+            HttpEntity<String> entity = createHttpEntity(imagePath);
             ResponseEntity<String> response = restTemplate.exchange(GEOSERVER_WPS_URL, HttpMethod.POST, entity, String.class);
 
             if (response.getStatusCode() == HttpStatus.OK) {
@@ -104,5 +77,36 @@ public class UploadServiceImpl implements UploadService {
         } catch (IOException e) {
             throw new RuntimeException("Error processing Geoserver WPS response", e);
         }
+    }
+
+    private HttpEntity<String> createHttpEntity(String imagePath) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_XML);
+
+        String requestBody = String.format(
+                "<wps:Execute version=\"1.0.0\" service=\"WPS\" " +
+                        "xmlns:wps=\"http://www.opengis.net/wps/1.0.0\" " +
+                        "xmlns:ows=\"http://www.opengis.net/ows/1.1\" " +
+                        "xmlns:xlink=\"http://www.w3.org/1999/xlink\" " +
+                        "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" " +
+                        "xsi:schemaLocation=\"http://www.opengis.net/wps/1.0.0 " +
+                        "http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd\">" +
+                        "<ows:Identifier>your-wps-process-id</ows:Identifier>" +
+                        "<wps:DataInputs>" +
+                        "<wps:Input>" +
+                        "<ows:Identifier>imagePath</ows:Identifier>" +
+                        "<wps:Data>" +
+                        "<wps:LiteralData>%s</wps:LiteralData>" +
+                        "</wps:Data>" +
+                        "</wps:Input>" +
+                        "</wps:DataInputs>" +
+                        "<wps:ResponseForm>" +
+                        "<wps:RawDataOutput>" +
+                        "<ows:Identifier>result</ows:Identifier>" +
+                        "</wps:RawDataOutput>" +
+                        "</wps:ResponseForm>" +
+                        "</wps:Execute>", imagePath);
+
+        return new HttpEntity<>(requestBody, headers);
     }
 }
