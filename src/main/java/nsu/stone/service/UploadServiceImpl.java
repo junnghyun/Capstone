@@ -18,7 +18,7 @@ public class UploadServiceImpl implements UploadService {
 
     private final UploadRepository uploadRepository;
     private final RestTemplate restTemplate;
-    private static final String GEOSERVER_WPS_URL = "https://localhost:8081/geoserver/ows?service=WPS&version=1.0.0&request=Execute";
+    private static final String GEOSERVER_WPS_URL = "http://localhost:8081/geoserver/ows?service=WPS&version=1.0.0&request=Execute";
 
     @Autowired
     public UploadServiceImpl(UploadRepository uploadRepository, RestTemplate restTemplate) {
@@ -91,7 +91,7 @@ public class UploadServiceImpl implements UploadService {
                         "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" " +
                         "xsi:schemaLocation=\"http://www.opengis.net/wps/1.0.0 " +
                         "http://schemas.opengis.net/wps/1.0.0/wpsAll.xsd\">" +
-                        "<ows:Identifier>your-wps-process-id</ows:Identifier>" +
+                        "<ows:Identifier>gs:BufferFeatureCollection</ows:Identifier>" + // wpsProcessID
                         "<wps:DataInputs>" +
                         "<wps:Input>" +
                         "<ows:Identifier>imagePath</ows:Identifier>" +
