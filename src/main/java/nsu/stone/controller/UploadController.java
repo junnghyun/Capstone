@@ -1,7 +1,7 @@
 package nsu.stone.controller;
 
 import nsu.stone.dto.UploadDto;
-import nsu.stone.service.UploadService;
+import nsu.stone.service.ImageExifService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,17 +21,17 @@ import java.nio.file.Paths;
 public class UploadController {
 
     private static final Logger logger = LoggerFactory.getLogger(UploadController.class);
-    private final UploadService uploadService;
+    private final ImageExifService imageExifService; // 서비스 타입 변경
 
     @Autowired
-    public UploadController(UploadService uploadService) {
-        this.uploadService = uploadService;
+    public UploadController(ImageExifService imageExifService) { // 생성자에서 서비스 이름 변경
+        this.imageExifService = imageExifService;
     }
 
     @PostMapping("/upload")
     public UploadDto uploadImage(@RequestParam("image") MultipartFile image) {
         String imagePath = saveImageToFileSystem(image);
-        return uploadService.processImage(imagePath);
+        return imageExifService.processImage(imagePath); // 서비스 호출 변경
     }
 
     private String saveImageToFileSystem(MultipartFile image) {
