@@ -4,6 +4,7 @@ import com.drew.imaging.ImageMetadataReader;
 import com.drew.lang.GeoLocation;
 import com.drew.metadata.Metadata;
 import com.drew.metadata.MetadataException;
+import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.exif.GpsDirectory;
 import nsu.stone.domain.Upload;
 import nsu.stone.dto.UploadDto;
@@ -22,6 +23,8 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.MathContext;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,6 +33,7 @@ public class ImageExifServiceImpl implements ImageExifService {
 
     private final UploadRepository uploadRepository;
     private final GeometryFactory geometryFactory = new GeometryFactory();
+    private static final MathContext MATH_CONTEXT = new MathContext(8); // 소수점 이하 8자리
 
     @Autowired
     public ImageExifServiceImpl(UploadRepository uploadRepository) {
@@ -42,16 +46,16 @@ public class ImageExifServiceImpl implements ImageExifService {
             File imageFile = new File(imagePath);
             Metadata metadata = readMetadata(imageFile);
             GeoLocation geoLocation = extractGeoLocation(metadata);
-            double altitude = extractAltitude(metadata);  // 고도 추출
+            double altitude = extractAltitude(metadata);
+            int orientation = extractOrientation(metadata);
 
             if (geoLocation != null) {
-                // 이미지 너비와 높이 추출
                 Map<String, Integer> dimensions = getImageDimensions(imageFile);
                 int width = dimensions.get("width");
                 int height = dimensions.get("height");
 
-                // 각 모서리 좌표 계산 (고도 및 시야각 반영)
-                Map<String, double[]> edgeCoordinates = calculateCoordinatesAtEdges(geoLocation.getLatitude(), geoLocation.getLongitude(), altitude, width, height);
+                // 각 모서리 좌표 계산 (정밀도 높임)
+                Map<String, double[]> edgeCoordinates = calculateCoordinatesAtEdges(geoLocation.getLatitude(), geoLocation.getLongitude(), altitude, width, height, orientation);
 
                 // EPSG:5186 좌표계로 변환
                 Map<String, double[]> edgeCoordinatesEPSG5186 = convertCoordinatesToEPSG5186(edgeCoordinates);
@@ -59,7 +63,6 @@ public class ImageExifServiceImpl implements ImageExifService {
                 // Geometry 객체로 변환 및 저장
                 Upload upload = createAndSaveUpload(imagePath, edgeCoordinatesEPSG5186);
 
-                // UploadDto 객체 생성 및 반환
                 return createUploadDto(upload);
             } else {
                 throw new RuntimeException("유효한 GPS 데이터를 찾을 수 없습니다.");
@@ -91,8 +94,20 @@ public class ImageExifServiceImpl implements ImageExifService {
                 throw new RuntimeException(e);
             }
         } else {
-            return 0.0;  // 고도 정보가 없을 경우 0으로 처리
+            return 0.0;
         }
+    }
+
+    private int extractOrientation(Metadata metadata) {
+        ExifIFD0Directory directory = metadata.getFirstDirectoryOfType(ExifIFD0Directory.class);
+        if (directory != null && directory.containsTag(ExifIFD0Directory.TAG_ORIENTATION)) {
+            try {
+                return directory.getInt(ExifIFD0Directory.TAG_ORIENTATION);
+            } catch (MetadataException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return 1;
     }
 
     private Map<String, Integer> getImageDimensions(File imageFile) throws IOException {
@@ -106,32 +121,45 @@ public class ImageExifServiceImpl implements ImageExifService {
         return dimensions;
     }
 
-    // 모서리 좌표 계산에 고도와 시야각 반영
-    private Map<String, double[]> calculateCoordinatesAtEdges(double latitude, double longitude, double altitude, int width, int height) {
-        // 카메라의 수평 및 수직 시야각 (예: 90도, 필요시 카메라 설정에 맞게 수정)
-        double horizontalFov = 90.0;  // 수평 시야각
-        double verticalFov = 60.0;    // 수직 시야각
+    private Map<String, double[]> calculateCoordinatesAtEdges(double latitude, double longitude, double altitude, int width, int height, int orientation) {
+        double horizontalFov = 30.0;
+        double verticalFov = 20.0;
 
-        // 각도를 라디안으로 변환
         double hFovRad = Math.toRadians(horizontalFov / 2);
         double vFovRad = Math.toRadians(verticalFov / 2);
 
-        // 지면과의 거리 (단순 삼각법으로 계산)
-        double halfWidth = altitude * Math.tan(hFovRad);  // 지면에서 카메라 좌우로 떨어진 거리
-        double halfHeight = altitude * Math.tan(vFovRad); // 지면에서 카메라 상하로 떨어진 거리
+        double halfWidthMeters = altitude * Math.tan(hFovRad);
+        double halfHeightMeters = altitude * Math.tan(vFovRad);
 
-        // 경도 1도당 미터 환산계수(대략적인 값)
-        double metersPerDegreeLat = 111320; // 1도 위도는 약 111.32 km
-        double metersPerDegreeLon = metersPerDegreeLat * Math.cos(Math.toRadians(latitude)); // 위도에 따라 경도의 길이가 달라짐
+        double metersPerPixelWidth = (2 * halfWidthMeters) / (double) width;
+        double metersPerPixelHeight = (2 * halfHeightMeters) / (double) height;
 
-        // 각 모서리의 위도와 경도 계산
-        double dLat = halfHeight / metersPerDegreeLat;
-        double dLon = halfWidth / metersPerDegreeLon;
+        double metersPerDegreeLat = 111320;
+        double metersPerDegreeLon = metersPerDegreeLat * Math.cos(Math.toRadians(latitude));
 
-        double[] leftTop = {latitude + dLat, longitude - dLon};
-        double[] rightTop = {latitude + dLat, longitude + dLon};
-        double[] leftBottom = {latitude - dLat, longitude - dLon};
-        double[] rightBottom = {latitude - dLat, longitude + dLon};
+        double dLatPerPixel = metersPerPixelHeight / metersPerDegreeLat;
+        double dLonPerPixel = metersPerPixelWidth / metersPerDegreeLon;
+
+        double widthHalf = width / 2.0;
+        double heightHalf = height / 2.0;
+
+        double[] leftTop = {latitude + (heightHalf * dLatPerPixel), longitude - (widthHalf * dLonPerPixel)};
+        double[] rightTop = {latitude + (heightHalf * dLatPerPixel), longitude + (widthHalf * dLonPerPixel)};
+        double[] leftBottom = {latitude - (heightHalf * dLatPerPixel), longitude - (widthHalf * dLonPerPixel)};
+        double[] rightBottom = {latitude - (heightHalf * dLatPerPixel), longitude + (widthHalf * dLonPerPixel)};
+
+        switch (orientation) {
+            case 1:
+                break;
+            case 6:
+                return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 90);
+            case 3:
+                return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 180);
+            case 8:
+                return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 270);
+            default:
+                throw new RuntimeException("지원하지 않는 방향 정보입니다.");
+        }
 
         Map<String, double[]> coordinates = new HashMap<>();
         coordinates.put("left_top", leftTop);
@@ -140,6 +168,32 @@ public class ImageExifServiceImpl implements ImageExifService {
         coordinates.put("right_bottom", rightBottom);
 
         return coordinates;
+    }
+
+    private Map<String, double[]> rotateCoordinates(double[] leftTop, double[] rightTop, double[] leftBottom, double[] rightBottom, int angle) {
+        double[] center = {(leftTop[0] + rightBottom[0]) / 2, (leftTop[1] + rightBottom[1]) / 2};
+        Map<String, double[]> rotatedCoordinates = new HashMap<>();
+
+        rotatedCoordinates.put("left_top", rotatePoint(leftTop, center, angle));
+        rotatedCoordinates.put("right_top", rotatePoint(rightTop, center, angle));
+        rotatedCoordinates.put("left_bottom", rotatePoint(leftBottom, center, angle));
+        rotatedCoordinates.put("right_bottom", rotatePoint(rightBottom, center, angle));
+
+        return rotatedCoordinates;
+    }
+
+    private double[] rotatePoint(double[] point, double[] center, int angle) {
+        double radians = Math.toRadians(angle);
+        double cosTheta = Math.cos(radians);
+        double sinTheta = Math.sin(radians);
+
+        double x = point[0] - center[0];
+        double y = point[1] - center[1];
+
+        double xNew = x * cosTheta - y * sinTheta + center[0];
+        double yNew = x * sinTheta + y * cosTheta + center[1];
+
+        return new double[]{xNew, yNew};
     }
 
     private Map<String, double[]> convertCoordinatesToEPSG5186(Map<String, double[]> coordinates) {
@@ -157,15 +211,19 @@ public class ImageExifServiceImpl implements ImageExifService {
 
         for (Map.Entry<String, double[]> entry : coordinates.entrySet()) {
             double[] latLon = entry.getValue();
-            srcCoord.x = latLon[1]; // 경도
-            srcCoord.y = latLon[0]; // 위도
+            srcCoord.x = new BigDecimal(Double.toString(latLon[1])).doubleValue(); // 경도
+            srcCoord.y = new BigDecimal(Double.toString(latLon[0])).doubleValue(); // 위도
 
             transform.transform(srcCoord, destCoord);
-            epsg5186Coordinates.put(entry.getKey(), new double[]{destCoord.x, destCoord.y});
+            epsg5186Coordinates.put(entry.getKey(), new double[]{
+                    new BigDecimal(destCoord.x).round(MATH_CONTEXT).doubleValue(),
+                    new BigDecimal(destCoord.y).round(MATH_CONTEXT).doubleValue()
+            });
         }
 
         return epsg5186Coordinates;
     }
+
 
     private Geometry createGeometry(double[] coordinates) {
         return geometryFactory.createPoint(new org.locationtech.jts.geom.Coordinate(coordinates[0], coordinates[1]));
