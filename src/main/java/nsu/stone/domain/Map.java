@@ -3,22 +3,30 @@ package nsu.stone.domain;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-
-import java.util.UUID;
+import org.locationtech.jts.geom.Point;
 
 @Entity
-@Getter
-@Setter
-@Table(name = "map", schema = "public")
+@Getter @Setter
+@Table(name = "upload")
 public class Map {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private UUID id;
-    @Lob
-    private byte[] image;
-    private String yoloData;
-    private String crackType;
-    private Double xCoordinate;
-    private Double yCoordinate;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "image_path", nullable = false)
+    private String imagePath;
+
+    @Column(name = "top_left", columnDefinition = "Geometry(Point, 5181)")
+    private Point topLeft;
+
+    @Column(name = "top_right", columnDefinition = "Geometry(Point, 5181)")
+    private Point topRight;
+
+    @Column(name = "bottom_left", columnDefinition = "Geometry(Point, 5181)")
+    private Point bottomLeft;
+
+    @Column(name = "bottom_right", columnDefinition = "Geometry(Point, 5181)")
+    private Point bottomRight;
 }
 

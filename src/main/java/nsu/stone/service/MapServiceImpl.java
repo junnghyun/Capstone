@@ -7,56 +7,31 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 public class MapServiceImpl implements MapService {
+
+    private final MapRepository mapRepository;
+
     @Autowired
-    private MapRepository mapRepository;
-
-    @Override
-    public MapDto getMapById(UUID id) {
-        Map map = mapRepository.findById(id).orElseThrow(() -> new RuntimeException("Map not found"));
-        return convertToDto(map);
+    public MapServiceImpl(MapRepository mapRepository) {
+        this.mapRepository = mapRepository;
     }
 
     @Override
-    public List<MapDto> getAllMaps() {
-        return mapRepository.findAll().stream().map(this::convertToDto).collect(Collectors.toList());
-    }
-
-    @Override
-    public MapDto saveMap(MapDto mapDto) {
-        Map map = convertToEntity(mapDto);
-        map = mapRepository.save(map);
-        return convertToDto(map);
-    }
-
-    @Override
-    public void deleteMap(UUID id) {
-        mapRepository.deleteById(id);
-    }
-
-    private MapDto convertToDto(Map map) {
-        MapDto mapDto = new MapDto();
-        mapDto.setId(map.getId());
-        mapDto.setImage(map.getImage());
-        mapDto.setYoloData(map.getYoloData());
-        mapDto.setCrackType(map.getCrackType());
-        mapDto.setXCoordinate(map.getXCoordinate());
-        mapDto.setYCoordinate(map.getYCoordinate());
-        return mapDto;
-    }
-
-    private Map convertToEntity(MapDto mapDto) {
-        Map map = new Map();
-        map.setId(mapDto.getId());
-        map.setImage(mapDto.getImage());
-        map.setYoloData(mapDto.getYoloData());
-        map.setCrackType(mapDto.getCrackType());
-        map.setXCoordinate(mapDto.getXCoordinate());
-        map.setYCoordinate(mapDto.getYCoordinate());
-        return map;
+    public List<MapDto> getAllUploads() {
+        List<Map> uploads = mapRepository.findAll();
+        return uploads.stream().map(map -> new MapDto(
+                map.getImagePath(),
+                map.getTopLeft().getCoordinate().getX(), // X는 경도
+                map.getTopLeft().getCoordinate().getY(), // Y는 위도
+                map.getTopRight().getCoordinate().getX(),
+                map.getTopRight().getCoordinate().getY(),
+                map.getBottomLeft().getCoordinate().getX(),
+                map.getBottomLeft().getCoordinate().getY(),
+                map.getBottomRight().getCoordinate().getX(),
+                map.getBottomRight().getCoordinate().getY()
+        )).collect(Collectors.toList());
     }
 }

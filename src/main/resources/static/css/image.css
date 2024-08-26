@@ -14,7 +14,7 @@ body {
     padding: 15px;
     justify-content: center;
     min-height: 100vh;
-    background: #5145BA;
+    background: #549ee7;
 }
 
 .file-uploader {
@@ -78,7 +78,7 @@ body {
     align-items: center;
     justify-content: center;
     border-radius: 15px;
-    background: #5145BA;
+    background: #549ee7;
 }
 
 .file-list .file-item .file-content-wrapper {
@@ -110,7 +110,7 @@ body {
 }
 
 .file-list .file-item .file-info .file-status {
-    color: #5145BA;
+    color: #549ee7;
 }
 
 .file-list .file-item .cancel-button {
@@ -138,7 +138,7 @@ body {
     width: 0%;
     height: inherit;
     border-radius: inherit;
-    background: #5145BA;
+    background: #549ee7;
 }
 
 .file-uploader .file-upload-box {
@@ -153,7 +153,7 @@ body {
 }
 
 .file-uploader .file-upload-box.active {
-    border: 2px solid #5145BA;
+    border: 2px solid #549ee7;
     background: #F3F6FF;
 }
 
@@ -168,7 +168,7 @@ body {
 }
 
 .file-upload-box .box-title .file-browse-button {
-    color: #5145BA;
+    color: #549ee7;
     cursor: pointer;
 }
 
@@ -181,7 +181,7 @@ body {
     bottom: 30px;
     right: 40px;
     padding: 10px 20px;
-    background-color: #4CAF50;
+    background-color: #4c59af;
     color: white;
     border: none;
     border-radius: 5px;
