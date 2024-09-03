@@ -151,9 +151,9 @@ public class ImageExifServiceImpl implements ImageExifService {
         switch (orientation) {
             case 1:
                 break;
-            case 6:
-                return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 90);
             case 3:
+                return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 90);
+            case 6:
                 return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 180);
             case 8:
                 return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 270);

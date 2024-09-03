@@ -255,7 +255,7 @@ body.dark {
   height: 100%;
   z-index: 1;
   position: relative;
-  margin-left: 260px; /* Match the sidebar width */
+  /*margin-left: 260px; /* Match the sidebar width */
   margin-top: 70px; /* Adjust for the height of the navbar */
 }
 

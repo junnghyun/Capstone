@@ -48,7 +48,7 @@ var roadPath = [
     new kakao.maps.LatLng(36.911221, 127.12851)
 ];
 
-var content = '<img id="roadImage" src="/Users/anjeonghyeon/Downloads/rotated_image.jpg" alt="도로 이미지" style="position: absolute;">';
+var content = '<img id="roadImage" src="/img/rotated_image.jpg" alt="도로 이미지" style="position: absolute;">';
 
 var customOverlay = new kakao.maps.CustomOverlay({
     map: map,
