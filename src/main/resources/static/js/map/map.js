@@ -44,11 +44,11 @@ if (navigator.geolocation) {
 var markerPosition = new kakao.maps.LatLng(36.911602, 127.12831);
 
 var roadPath = [
-    new kakao.maps.LatLng(36.911602, 127.12831),
-    new kakao.maps.LatLng(36.911221, 127.12851)
+    new kakao.maps.LatLng(36.911663, 127.1282),
+    new kakao.maps.LatLng(36.911161, 127.12859)
 ];
 
-var content = '<img id="roadImage" src="/img/rotated_image.jpg" alt="도로 이미지" style="position: absolute;">';
+var content = '<img id="roadImage" src="/img/rotated_DJI_0333.JPG" alt="도로 이미지" style="position: absolute;">';
 
 var customOverlay = new kakao.maps.CustomOverlay({
     map: map,

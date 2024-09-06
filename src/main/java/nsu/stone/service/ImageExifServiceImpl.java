@@ -11,15 +11,13 @@ import nsu.stone.dto.UploadDto;
 import nsu.stone.repository.UploadRepository;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.proj4j.CRSFactory;
-import org.locationtech.proj4j.CoordinateReferenceSystem;
-import org.locationtech.proj4j.CoordinateTransform;
-import org.locationtech.proj4j.CoordinateTransformFactory;
-import org.locationtech.proj4j.ProjCoordinate;
+import org.locationtech.proj4j.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.imageio.ImageIO;
+import java.awt.geom.AffineTransform;
+import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -34,6 +32,7 @@ public class ImageExifServiceImpl implements ImageExifService {
     private final UploadRepository uploadRepository;
     private final GeometryFactory geometryFactory = new GeometryFactory();
     private static final MathContext MATH_CONTEXT = new MathContext(8); // 소수점 이하 8자리
+    private static final String BASE_DIRECTORY = "/Users/anjeonghyeon/Downloads/capstone/";
 
     @Autowired
     public ImageExifServiceImpl(UploadRepository uploadRepository) {
@@ -55,7 +54,9 @@ public class ImageExifServiceImpl implements ImageExifService {
                 int height = dimensions.get("height");
 
                 // 각 모서리 좌표 계산 (정밀도 높임)
-                Map<String, double[]> edgeCoordinates = calculateCoordinatesAtEdges(geoLocation.getLatitude(), geoLocation.getLongitude(), altitude, width, height, orientation);
+                Map<String, double[]> edgeCoordinates = calculateCoordinatesAtEdges(
+                        geoLocation.getLatitude(), geoLocation.getLongitude(), altitude, width, height, orientation, imagePath
+                );
 
                 // EPSG:5186 좌표계로 변환
                 Map<String, double[]> edgeCoordinatesEPSG5186 = convertCoordinatesToEPSG5186(edgeCoordinates);
@@ -121,9 +122,9 @@ public class ImageExifServiceImpl implements ImageExifService {
         return dimensions;
     }
 
-    private Map<String, double[]> calculateCoordinatesAtEdges(double latitude, double longitude, double altitude, int width, int height, int orientation) {
+    private Map<String, double[]> calculateCoordinatesAtEdges(double latitude, double longitude, double altitude, int width, int height, int orientation, String imagePath) {
         double horizontalFov = 30.0;
-        double verticalFov = 20.0;
+        double verticalFov = 29.0;
 
         double hFovRad = Math.toRadians(horizontalFov / 2);
         double vFovRad = Math.toRadians(verticalFov / 2);
@@ -134,7 +135,7 @@ public class ImageExifServiceImpl implements ImageExifService {
         double metersPerPixelWidth = (2 * halfWidthMeters) / (double) width;
         double metersPerPixelHeight = (2 * halfHeightMeters) / (double) height;
 
-        double metersPerDegreeLat = 111320;
+        double metersPerDegreeLat = 111000;
         double metersPerDegreeLon = metersPerDegreeLat * Math.cos(Math.toRadians(latitude));
 
         double dLatPerPixel = metersPerPixelHeight / metersPerDegreeLat;
@@ -148,14 +149,24 @@ public class ImageExifServiceImpl implements ImageExifService {
         double[] leftBottom = {latitude - (heightHalf * dLatPerPixel), longitude - (widthHalf * dLonPerPixel)};
         double[] rightBottom = {latitude - (heightHalf * dLatPerPixel), longitude + (widthHalf * dLonPerPixel)};
 
+        // 회전된 이미지 처리 및 저장
+        try {
+            BufferedImage originalImage = ImageIO.read(new File(imagePath));
+            BufferedImage rotatedImage = rotateImage(originalImage, orientation);
+            saveRotatedImage(rotatedImage, imagePath);
+        } catch (IOException e) {
+            throw new RuntimeException("이미지를 처리하는 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
+
+        // 이미지 회전 및 좌표 계산
         switch (orientation) {
-            case 1:
+            case 8:
                 break;
             case 3:
-                return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 90);
-            case 6:
                 return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 180);
-            case 8:
+            case 6:
+                return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 90);
+            case 1:
                 return rotateCoordinates(leftTop, rightTop, leftBottom, rightBottom, 270);
             default:
                 throw new RuntimeException("지원하지 않는 방향 정보입니다.");
@@ -168,6 +179,55 @@ public class ImageExifServiceImpl implements ImageExifService {
         coordinates.put("right_bottom", rightBottom);
 
         return coordinates;
+    }
+
+    private BufferedImage rotateImage(BufferedImage image, int orientation) {
+        double angle = switch (orientation) {
+            case 1 -> -90;
+            case 3 -> 180;
+            case 6 -> 90;
+            case 8 -> -90;
+            default -> throw new RuntimeException("지원하지 않는 방향 정보입니다: " + orientation);
+        };
+
+        double rads = Math.toRadians(angle);
+        double sin = Math.abs(Math.sin(rads));
+        double cos = Math.abs(Math.cos(rads));
+        int w = image.getWidth();
+        int h = image.getHeight();
+        int newWidth = (int) Math.floor(w * cos + h * sin);
+        int newHeight = (int) Math.floor(h * cos + w * sin);
+
+        BufferedImage rotated = new BufferedImage(newWidth, newHeight, image.getType());
+        AffineTransform at = new AffineTransform();
+        at.translate((newWidth - w) / 2.0, (newHeight - h) / 2.0);
+
+        int x = w / 2;
+        int y = h / 2;
+
+        at.rotate(rads, x, y);
+
+        AffineTransformOp rotateOp = new AffineTransformOp(at, AffineTransformOp.TYPE_BILINEAR);
+        rotateOp.filter(image, rotated);
+        return rotated;
+    }
+
+
+    private void saveRotatedImage(BufferedImage rotatedImage, String imagePath) throws IOException {
+        // Extract the filename from the original image path
+        File originalFile = new File(imagePath);
+        String originalFilename = originalFile.getName(); // Get the filename with extension
+
+        // Construct the new filename with "rotated_" prefix
+        String rotatedFilename = "rotated_" + originalFilename;
+
+        // Construct the full path for the rotated image
+        String rotatedImagePath = BASE_DIRECTORY + rotatedFilename;
+
+        // Save the rotated image to the constructed path
+        File outputfile = new File(rotatedImagePath);
+        ImageIO.write(rotatedImage, "jpg", outputfile);
+        System.out.println("Rotated image saved at: " + outputfile.getAbsolutePath());
     }
 
     private Map<String, double[]> rotateCoordinates(double[] leftTop, double[] rightTop, double[] leftBottom, double[] rightBottom, int angle) {
@@ -199,7 +259,7 @@ public class ImageExifServiceImpl implements ImageExifService {
     private Map<String, double[]> convertCoordinatesToEPSG5186(Map<String, double[]> coordinates) {
         CRSFactory crsFactory = new CRSFactory();
         CoordinateReferenceSystem crs4326 = crsFactory.createFromName("EPSG:4326");
-        CoordinateReferenceSystem crs5186 = crsFactory.createFromName("EPSG:5186");
+        CoordinateReferenceSystem crs5186 = crsFactory.createFromName("EPSG:4326");
 
         CoordinateTransformFactory transformFactory = new CoordinateTransformFactory();
         CoordinateTransform transform = transformFactory.createTransform(crs4326, crs5186);
@@ -223,7 +283,6 @@ public class ImageExifServiceImpl implements ImageExifService {
 
         return epsg5186Coordinates;
     }
-
 
     private Geometry createGeometry(double[] coordinates) {
         return geometryFactory.createPoint(new org.locationtech.jts.geom.Coordinate(coordinates[0], coordinates[1]));
